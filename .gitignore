@@ -1,0 +1,38 @@
+# Build artifacts
+target/
+**/*.rs.bk
+*.pdb
+
+# Gradle (device-server, device-app)
+.gradle/
+build/
+**/build/
+*.iml
+.idea/
+local.properties
+captures/
+.externalNativeBuild
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Java
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local

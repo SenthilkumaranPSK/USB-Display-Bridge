@@ -1,0 +1,24 @@
+[package]
+name = "usb-display-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Wired USB display bridge between an Android phone and a desktop PC."
+license = "Apache-2.0"
+repository = "https://github.com/yourname/usb-display-bridge"
+readme = "../README.md"
+
+[[bin]]
+name = "usb-display-bridge"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ffmpeg-next = "8.1.0"
+sdl2 = "0.38.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
