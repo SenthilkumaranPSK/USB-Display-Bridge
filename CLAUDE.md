@@ -43,10 +43,27 @@ cleaner in Java and matches available reference material.
 
 **Extend-mode phone app: Kotlin, `MediaCodec` + `SurfaceView`.**
 
-> **Windows caveat:** `ffmpeg-next` needs FFmpeg dev headers and `pkg-config`.
-> On Windows use MSYS2 (`mingw-w64-x86_64-ffmpeg`) or develop on Linux. If
-> toolchain setup burns more than one session, switch the host to C++ with
-> Meson + SDL2 + FFmpeg and update this section. Do not switch silently.
+> **Windows toolchain (resolved during M1, one session, no stack switch
+> needed):** `ffmpeg-next` and `sdl2` build and link against MSYS2. Working
+> recipe on this machine:
+> - In an MSYS2 shell: `pacman -S mingw-w64-x86_64-ffmpeg
+>   mingw-w64-x86_64-SDL2 mingw-w64-x86_64-pkg-config
+>   mingw-w64-x86_64-clang`. The `clang` package is required for
+>   `libclang.dll`, which `ffmpeg-sys-next`'s bindgen step needs even
+>   though nothing else in the project touches clang directly.
+> - The active `rustup` toolchain must be `stable-x86_64-pc-windows-gnu`,
+>   not `-msvc` — it has to match MSYS2 mingw64's ABI.
+> - `C:\msys64\mingw64\bin` must be on `PATH` at both build time (pkg-config,
+>   gcc/ld) and run time (`SDL2.dll`, `avcodec-*.dll`, etc. are linked
+>   dynamically).
+> - Symptom of a *different*, incompatible mingw-w64 toolchain shadowing
+>   MSYS2's on `PATH`: a linker error mentioning `undefined reference to
+>   _gnu_exception_handler` rather than a missing-tool error. Check
+>   `where.exe x86_64-w64-mingw32-gcc.exe` for a stale entry ahead of
+>   `C:\msys64\mingw64\bin`.
+>
+> The C++/Meson fallback this section used to threaten is not needed —
+> leaving the note here only so nobody re-litigates the stack decision.
 
 ---
 
