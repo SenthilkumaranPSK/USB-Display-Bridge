@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Required for any socket, including the loopback connection back to
+         the host over the adb reverse tunnel: Android gates AF_INET
+         socket creation on this permission regardless of destination. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="USB Display Bridge Extend"
+        android:allowBackup="false"
+        android:theme="@style/Theme.Extend">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:theme="@style/Theme.Extend">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

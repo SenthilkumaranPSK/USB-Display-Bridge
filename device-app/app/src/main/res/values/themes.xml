@@ -1,0 +1,6 @@
+<resources>
+    <!-- Plain platform fullscreen theme, no action bar: avoids pulling in
+         an AppCompat/Material dependency for an app that's just one
+         fullscreen SurfaceView. -->
+    <style name="Theme.Extend" parent="android:Theme.Black.NoTitleBar.Fullscreen" />
+</resources>

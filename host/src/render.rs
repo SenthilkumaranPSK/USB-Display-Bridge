@@ -25,8 +25,14 @@ pub fn open(title: &str, width: u32, height: u32) -> Result<Display> {
     let video = sdl
         .video()
         .map_err(|e| anyhow::anyhow!("sdl video subsystem: {e}"))?;
+    // The video's native size (e.g. a phone's 1080x2400) can easily exceed
+    // the PC display, which would create a window wider or taller than the
+    // screen -- centered, so both edges run off-screen. Shrink the *window*
+    // to fit; logical size stays at the native resolution below so SDL
+    // scales the picture down to match rather than cropping it.
+    let (win_w, win_h) = fit_to_display(&video, width, height);
     let window = video
-        .window(title, width, height)
+        .window(title, win_w, win_h)
         .position_centered()
         .resizable()
         .build()
@@ -48,6 +54,25 @@ pub fn open(title: &str, width: u32, height: u32) -> Result<Display> {
         event_pump,
         canvas,
     })
+}
+
+/// Scale `(width, height)` down to fit within the primary display's usable
+/// bounds, preserving aspect ratio. Returns the input unchanged if it
+/// already fits. Margin leaves room for window chrome and the taskbar.
+fn fit_to_display(video: &sdl2::VideoSubsystem, width: u32, height: u32) -> (u32, u32) {
+    let Ok(bounds) = video.display_bounds(0) else {
+        return (width, height);
+    };
+    let max_w = (bounds.width() as f64 * 0.9) as u32;
+    let max_h = (bounds.height() as f64 * 0.85) as u32;
+    if width <= max_w && height <= max_h {
+        return (width, height);
+    }
+    let scale = f64::min(max_w as f64 / width as f64, max_h as f64 / height as f64);
+    (
+        ((width as f64 * scale).round() as u32).max(1),
+        ((height as f64 * scale).round() as u32).max(1),
+    )
 }
 
 pub fn texture_creator(win: &Display) -> TextureCreator<WindowContext> {

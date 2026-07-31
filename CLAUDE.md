@@ -1,5 +1,8 @@
 # USB Display Bridge
 
+claude --resume 6807339f-d0d4-46ef-a7a6-2e75e380c41c
+
+
 A wired, USB-only bidirectional display bridge between an Android phone and a
 desktop PC.
 
@@ -156,6 +159,13 @@ M1 is deliberately throwaway. It de-risks decode and display before any Java
 is written. Tag it `v0.1-naive` and keep the tag.
 
 Ship-worthy point is M4. M5 and M6 are upside.
+
+**Re-scope (2026-07-30):** M6 is being built ahead of M2-M5 at the project
+owner's explicit request. M2's custom device-server and M5's control socket
+don't exist yet, so extend mode uses its own standalone video socket instead
+of the three-socket scheme described above, documented separately in
+`docs/protocol.md` and `docs/extend-mode.md`. M2-M5 remain the plan for the
+mirror path once extend mode is working.
 
 ---
 

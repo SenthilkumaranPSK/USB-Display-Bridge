@@ -178,58 +178,112 @@ pub fn select_device(adb: &Path, serial: Option<&str>) -> Result<Device> {
 pub fn push_file(adb: &Path, serial: &str, local: &Path) -> Result<PathBuf> {
     let name = local
         .file_name()
-        .ok_or_else(|| anyhow!("local path has no filename: {}", local.display()))?;
-    let remote = PathBuf::from(DEVICE_TMP).join(name);
-    let remote_str = remote.to_string_lossy().into_owned();
+        .ok_or_else(|| anyhow!("local path has no filename: {}", local.display()))?
+        .to_string_lossy();
+    // Remote paths are always POSIX (this runs on the device's shell), so we
+    // join with `/` explicitly rather than `PathBuf::join`, which would use
+    // `\` on a Windows host and produce a single bad filename on the device.
+    let remote_str = format!("{DEVICE_TMP}/{name}");
     let local_str = local.to_string_lossy().into_owned();
     run(adb, ["-s", serial, "push", &local_str, &remote_str]).context("adb push failed")?;
-    Ok(remote)
+    Ok(PathBuf::from(remote_str))
 }
 
-/// RAII guard for `adb reverse localabstract:<name> tcp:<port>`. Removing on
-/// drop means Ctrl-C, normal exit, and panics all tear the tunnel down.
-/// If the process is killed outright (SIGKILL), `adb` itself clears reverse
+/// RAII guard for `adb reverse <remote_spec> tcp:<port>`. Removing on drop
+/// means Ctrl-C, normal exit, and panics all tear the tunnel down. If the
+/// process is killed outright (SIGKILL), `adb` itself clears reverse
 /// tunnels on client disconnect, so the tunnel does not leak.
 pub struct TunnelGuard<'a> {
     adb: &'a Path,
     serial: &'a str,
-    name: String,
+    remote_spec: String,
 }
 
 impl<'a> TunnelGuard<'a> {
-    pub fn open(adb: &'a Path, serial: &'a str, name: &str, port: u16) -> Result<Self> {
-        let port_s = port.to_string();
+    /// General form. The mirror path's Java server uses Android's
+    /// `LocalSocket` (abstract Unix socket), reached via
+    /// `localabstract:<name>` -- see `open()` below. A normal installed app
+    /// like extend mode's Kotlin receiver just does `Socket("127.0.0.1",
+    /// port)`, reached via `tcp:<port>` instead, so the remote spec has to
+    /// be caller-supplied rather than hardcoded to one form.
+    pub fn open_remote(
+        adb: &'a Path,
+        serial: &'a str,
+        remote_spec: &str,
+        host_port: u16,
+    ) -> Result<Self> {
         run(
             adb,
             [
                 "-s",
                 serial,
                 "reverse",
-                &format!("localabstract:{name}"),
-                &format!("tcp:{port_s}"),
+                remote_spec,
+                &format!("tcp:{host_port}"),
             ],
         )
         .context("adb reverse failed")?;
-        debug!(name, port, "reverse tunnel open");
+        debug!(remote_spec, host_port, "reverse tunnel open");
         Ok(Self {
             adb,
             serial,
-            name: name.to_string(),
+            remote_spec: remote_spec.to_string(),
         })
+    }
+
+    pub fn open(adb: &'a Path, serial: &'a str, name: &str, port: u16) -> Result<Self> {
+        Self::open_remote(adb, serial, &format!("localabstract:{name}"), port)
     }
 }
 
 impl Drop for TunnelGuard<'_> {
     fn drop(&mut self) {
-        let target = format!("localabstract:{}", self.name);
         if let Err(e) = run(
             self.adb,
-            ["-s", self.serial, "reverse", "--remove", &target],
+            ["-s", self.serial, "reverse", "--remove", &self.remote_spec],
         ) {
-            warn!(?e, name = self.name, "failed to remove reverse tunnel");
+            warn!(?e, remote_spec = %self.remote_spec, "failed to remove reverse tunnel");
         } else {
-            debug!(name = self.name, "reverse tunnel closed");
+            debug!(remote_spec = %self.remote_spec, "reverse tunnel closed");
         }
+    }
+}
+
+/// `adb install -r <apk>`. `-r` so a stale install from a previous crashed
+/// session doesn't block a fresh one.
+pub fn install_apk(adb: &Path, serial: &str, apk: &Path) -> Result<()> {
+    let apk_str = apk.to_string_lossy().into_owned();
+    run(adb, ["-s", serial, "install", "-r", &apk_str]).context("adb install failed")?;
+    Ok(())
+}
+
+/// `adb uninstall <package>`. Errors are logged, not propagated -- session
+/// teardown should not fail the whole run because uninstall raced with the
+/// device being unplugged or the app was never installed.
+pub fn uninstall(adb: &Path, serial: &str, package: &str) {
+    if let Err(e) = run(adb, ["-s", serial, "uninstall", package]) {
+        warn!(?e, package, "failed to uninstall device-app");
+    }
+}
+
+/// `adb shell am start -n <package>/<activity>`.
+pub fn start_activity(adb: &Path, serial: &str, package: &str, activity: &str) -> Result<()> {
+    let component = format!("{package}/{activity}");
+    run(
+        adb,
+        ["-s", serial, "shell", "am", "start", "-n", &component],
+    )
+    .context("adb shell am start failed")?;
+    Ok(())
+}
+
+/// `adb shell am force-stop <package>`. Used on teardown before uninstall:
+/// `am start` on a still-running Activity does not restart it cleanly, and
+/// uninstalling while it's still running can leave a dangling process.
+/// Same "log, don't propagate" reasoning as `uninstall`.
+pub fn force_stop(adb: &Path, serial: &str, package: &str) {
+    if let Err(e) = run(adb, ["-s", serial, "shell", "am", "force-stop", package]) {
+        warn!(?e, package, "failed to force-stop device-app");
     }
 }
 
